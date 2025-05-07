@@ -127,8 +127,8 @@
         // Build KODE→Target map (first non-empty hit)
         const targetMap = {};
         rawData.forEach(r => {
-          if (r.kode && r.target && !targetMap[r.kode]) {
-            targetMap[r.kode] = r.target;
+          if (r.KODE && r.Target && !targetMap[r.KODE]) {
+            targetMap[r.KODE] = r.Target;
           }
         });
 
