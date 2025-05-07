@@ -120,6 +120,23 @@
       }
     });
   })();
+Papa.parse(CSV_URL, {
+  download: true,
+  header: true,
+  skipEmptyLines: true,
+  error: err => console.error('CSV fetch/parse error:', err),
+  complete: results => {
+    console.log('🎉 CSV loaded, rows:', results.data.length, results.data);
+    
+    if (!results.data.length) {
+      document.body.insertAdjacentHTML('beforeend',
+        '<p style="color:red">No rows found – check your sheet or CSV_URL</p>');
+      return;
+    }
+
+    // … rest of your initialization
+  }
+});    
   </script>
 </body>
 </html>
