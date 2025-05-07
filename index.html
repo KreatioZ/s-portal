@@ -3,16 +3,13 @@
 <head>
   <meta charset="utf-8">
   <title>Sales Portal</title>
-  <!-- jQuery -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <!-- DataTables CSS & JS -->
   <link 
     rel="stylesheet" 
     href="https://cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css">
   <script 
     src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js">
   </script>
-  <!-- PapaParse for CSV parsing -->
   <script 
     src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js">
   </script>
@@ -26,7 +23,6 @@
 <body>
   <h1>Sales Portal</h1>
 
-  <!-- Filters -->
   <label>Salesman:
     <select id="salesFilter"><option value="">All</option></select>
   </label>
@@ -43,21 +39,12 @@
     </select>
   </label>
 
-  <!-- Table placeholder -->
   <table id="outletTable" class="display">
     <thead>
       <tr>
-        <th>Kode</th>
-        <th>Outlet</th>
-        <th>Target</th>
-        <th>Greentea</th>
-        <th>OT Check May</th>
-        <th>Sales</th>
-        <th>Hari</th>
-        <th>W1</th>
-        <th>W2</th>
-        <th>W3</th>
-        <th>W4</th>
+        <th>Kode</th><th>Outlet</th><th>Target</th>
+        <th>Greentea</th><th>OT Check May</th><th>Sales</th>
+        <th>Hari</th><th>W1</th><th>W2</th><th>W3</th><th>W4</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -65,87 +52,87 @@
 
   <script>
   (function(){
-    // 1) Paste your published‐CSV URL here (with &output=csv)
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQdbD6lgSNm6VyLRS4nJPMstGaZB-pgISgyyC2tSHLKIq5AwIDZLjV6wr45zrlvBatiTPycaJmpL0wy/pub?output=csv';
+    // ←––––––––––– CHANGE THIS to your sheet’s CSV URL –––––––––––→
+    const CSV_URL = 
+      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQdbD6lgSNm6VyLRS4nJPMstGaZB-pgISgyyC2tSHLKIq5AwIDZLjV6wr45zrlvBatiTPycaJmpL0wy/pub?output=csv';
 
-    // 2) Helper to fill dropdowns from the data
-    function populateFilter(id, data, col) {
-      const seen = new Set();
-      data.forEach(r => r[col] && seen.add(r[col]));
-      const sel = document.getElementById(id);
-      Array.from(seen).sort().forEach(v => {
-        const opt = document.createElement('option');
-        opt.value = v;
-        opt.textContent = v;
-        sel.appendChild(opt);
+    // Utility to populate a <select> from distinct values of colName
+    function populateSelect(selId, rows, colName) {
+      const seen = [...new Set(rows.map(r => r[colName]).filter(v=>v))].sort();
+      const sel = document.getElementById(selId);
+      seen.forEach(v => {
+        const opt = new Option(v, v);
+        sel.add(opt);
       });
     }
 
-    // 3) Custom filter logic for Week
-    $.fn.dataTable.ext.search.push(function(settings, row){
-      const salesVal = $('#salesFilter').val();
-      const dayVal   = $('#dayFilter').val();
-      const weekVal  = $('#weekFilter').val();
-      // row is an array: [ Kode, Outlet, Target, Greentea, OT, Sales, Hari, W1, W2, W3, W4 ]
-      const [ , , , , , , hari, w1, w2, w3, w4 ] = row;
-
-      // Salesman filter (column 5 in the original object)
-      if(salesVal && row[5] !== salesVal) return false;
-      // Day filter
-      if(dayVal   && hari  !== dayVal ) return false;
-      // Week filter
-      if(weekVal) {
-        const flag = row[6 + parseInt(weekVal,10)]; // W1→index7, W2→8, etc
-        if(!(flag && parseInt(flag,10) > 0)) return false;
-      }
-      return true;
-    });
-
-    // 4) Fetch & parse
+    // 1) Fetch & parse CSV
     Papa.parse(CSV_URL, {
       download: true,
       header: true,
       skipEmptyLines: true,
-      error: err => console.error('CSV error:', err),
-      complete: results => {
-        const data = results.data;
-        console.log('CSV rows:', data.length);
-
-        if(!data.length) {
+      error: err => console.error('CSV Error', err),
+      complete: res => {
+        // 2) Trim all header keys
+        const data = res.data.map(rawRow => {
+          const row = {};
+          Object.keys(rawRow).forEach(k => {
+            row[k.trim()] = rawRow[k];
+          });
+          return row;
+        });
+        if (!data.length) {
           document.body.insertAdjacentHTML('beforeend',
-            '<p style="color:red">⚠️ No data—check your CSV_URL or Sheet permissions.</p>');
+            '<p style="color:red">No data found – check your CSV_URL and Sheet</p>');
           return;
         }
 
-        // 5) Populate Salesman & Day filters
-        populateFilter('salesFilter', data, 'SALES');
-        populateFilter('dayFilter',   data, 'HARI');
+        // 3) Populate Salesman & Day filters
+        populateSelect('salesFilter', data, 'SALES');
+        populateSelect('dayFilter',   data, 'HARI');
 
-        // 6) Initialize DataTable by mapping directly to your sheet’s objects
+        // 4) Initialize DataTable
         const table = $('#outletTable').DataTable({
           data: data,
           columns: [
-            { title: 'Kode',         data: 'KODE'          },
-            { title: 'Outlet',       data: 'OUTLET'        },
-            { title: 'Target',       data: 'Target'        },
-            { title: 'Greentea',     data: 'GREENTEA'      },
-            { title: 'OT Check May', data: 'OT Check MAY'  },
-            { title: 'Sales',        data: 'SALES'         },
-            { title: 'Hari',         data: 'HARI'          },
-            { title: 'W1',           data: 'W1'            },
-            { title: 'W2',           data: 'W2'            },
-            { title: 'W3',           data: 'W3'            },
-            { title: 'W4',           data: 'W4'            }
+            { data: 'KODE',           title: 'Kode'          },
+            { data: 'OUTLET',         title: 'Outlet'        },
+            { data: 'Target',         title: 'Target'        },
+            { data: 'GREENTEA',       title: 'Greentea'      },
+            { data: 'OT Check MAY',   title: 'OT Check May'  },
+            { data: 'SALES',          title: 'Sales'         },
+            { data: 'HARI',           title: 'Hari'          },
+            { data: 'W1',             title: 'W1'            },
+            { data: 'W2',             title: 'W2'            },
+            { data: 'W3',             title: 'W3'            },
+            { data: 'W4',             title: 'W4'            }
           ],
           pageLength: 25
         });
 
-        // 7) Redraw on any filter change
-        $('#salesFilter, #dayFilter, #weekFilter')
-          .on('change', () => table.draw());
+        // 5) On filter‐change, re‐filter the raw data and redraw
+        $('#salesFilter, #dayFilter, #weekFilter').on('change', () => {
+          const s = $('#salesFilter').val();
+          const d = $('#dayFilter').val();
+          const w = $('#weekFilter').val();
+
+          const filtered = data.filter(r => {
+            if (s && r.SALES !== s) return false;
+            if (d && r.HARI  !== d) return false;
+            if (w) {
+              // check W1–W4 as numbers >0
+              const flag = parseFloat(r['W'+w]) || 0;
+              if (flag <= 0) return false;
+            }
+            return true;
+          });
+
+          table.clear();
+          table.rows.add(filtered);
+          table.draw();
+        });
       }
     });
-
   })();
   </script>
 </body>
