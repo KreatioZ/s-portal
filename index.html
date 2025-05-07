@@ -12,7 +12,7 @@
   <script 
     src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js">
   </script>
-  <!-- PapaParse -->
+  <!-- PapaParse for CSV -->
   <script 
     src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js">
   </script>
@@ -43,7 +43,7 @@
     </select>
   </label>
 
-  <!-- Table skeleton -->
+  <!-- Table container -->
   <table id="outletTable" class="display">
     <thead><tr>
       <th>Kode</th>
@@ -63,93 +63,94 @@
 
   <script>
   (function(){
-    // ←––––– replace with your sheet’s published-CSV URL (must end with &output=csv) –––––→
+    // ←– Replace with your actual published‐CSV URL (must end in &output=csv) –→
     const CSV_URL =
       'https://docs.google.com/spreadsheets/d/e/2PACX-1vQdbD6lgSNm6VyLRS4nJPMstGaZB-pgISgyyC2tSHLKIq5AwIDZLjV6wr45zrlvBatiTPycaJmpL0wy/pub?output=csv';
 
     let rawData = [], table = null;
 
-    // Utility: fill a <select> with distinct values from key
+    // Populate a <select> with the distinct values of 'key'
     function fill(selectId, rows, key) {
-      const seen = new Set(rows.map(r => r[key]).filter(v=>v));
+      const vals = [...new Set(rows.map(r => r[key]).filter(v=>v))].sort();
       const sel  = document.getElementById(selectId);
-      Array.from(seen).sort().forEach(v => sel.add(new Option(v, v)));
+      vals.forEach(v => sel.add(new Option(v, v)));
     }
 
-    // Render function: builds <tbody> then initializes DataTables
+    // Build the <tbody> HTML, then DataTables()
     function render(rows, targetMap) {
-      if (table) table.destroy();             // remove old DataTable
-      const $tbody = $('#outletTable tbody').empty();
+      if (table) table.destroy();
+      const $body = $('#outletTable tbody').empty();
 
       rows.forEach(r => {
-        const t = targetMap[r.KODE] || '';
+        const t = targetMap[r.kode] || '';
         const $tr = $('<tr>');
-        [ r.KODE, r.OUTLET, t, r.GREENTEA, r['OT Check MAY'],
-          r.SALES, r.HARI, r.W1, r.W2, r.W3, r.W4 ]
-        .forEach(v => $tr.append( $('<td>').text(v) ));
-        $tbody.append($tr);
+        [ r.kode, r.outlet, t, r.greentea, r['ot check may'],
+          r.sales, r.hari, r.w1, r.w2, r.w3, r.w4 ]
+        .forEach(val => $tr.append($('<td>').text(val)));
+        $body.append($tr);
       });
 
       table = $('#outletTable').DataTable({
         pageLength: 25,
-        columnDefs: [
-          { targets: 2, type: 'num' }  // ensure numeric sort on Target
-        ]
+        columnDefs: [{ targets: 2, type: 'num' }] // numeric sort on Target
       });
     }
 
-    // Apply filters and re-render
+    // Apply filters & re-render
     function applyFilters(targetMap) {
       const s = $('#salesFilter').val(),
             d = $('#dayFilter').val(),
             w = $('#weekFilter').val();
 
       const filtered = rawData.filter(r => {
-        if (s && r.SALES !== s) return false;
-        if (d && r.HARI  !== d) return false;
+        if (s && r.sales     !== s) return false;
+        if (d && r.hari      !== d) return false;
         if (w) {
-          const visits = Number(r['W'+w]) || 0;
-          if (visits <= 0) return false;
+          const v = +(r['w'+w]) || 0;
+          if (v <= 0) return false;
         }
         return true;
       });
-
       render(filtered, targetMap);
     }
 
-    // Fetch & parse CSV
+    // Fetch & parse
     Papa.parse(CSV_URL, {
       download: true,
       header: true,
       skipEmptyLines: true,
       error: err => {
-        console.error(err);
-        alert('Error loading data – check your CSV URL & share settings');
+        console.error('CSV error', err);
+        alert('Failed to load your sheet. Check the CSV_URL & sharing settings.');
       },
       complete: res => {
-        // Trim spaces off both keys & values
+        // Normalize all headers to lower-case trimmed keys,
+        // and trim all values to strings:
         rawData = res.data.map(r => {
           const o = {};
-          Object.keys(r).forEach(k => o[k.trim()] = (r[k]||'').trim());
+          Object.keys(r).forEach(origKey => {
+            const key = origKey.trim().toLowerCase();
+            o[key]  = (r[origKey]||'').toString().trim();
+          });
           return o;
         });
 
-        // Build map of KODE→Target (first non-empty per outlet)
+        // Build a KODE→Target map (first non-empty target wins)
         const targetMap = {};
         rawData.forEach(r => {
-          if (r.KODE && r.Target && !targetMap[r.KODE]) {
-            targetMap[r.KODE] = r.Target;
+          if (r.kode && r.target && !targetMap[r.kode]) {
+            targetMap[r.kode] = r.target;
           }
         });
 
-        // Populate Salesman & Day filters
-        fill('salesFilter', rawData, 'SALES');
-        fill('dayFilter',   rawData, 'HARI');
+        // Populate filters
+        fill('salesFilter', rawData, 'sales');
+        fill('dayFilter',   rawData, 'hari');
 
         // Initial render (all rows)
         render(rawData, targetMap);
 
-        // Hook up filter change
+        // Re-render when any filter changes
         $('#salesFilter,#dayFilter,#weekFilter')
           .on('change', () => applyFilters(targetMap));
       }
